@@ -332,6 +332,32 @@ static void stack_event_handler(uint32_t event, void* eventParam)
             break;
         }
 
+        case CY_BLE_EVT_GAP_DEVICE_CONNECTED:
+        {
+            /* BLE link is established */
+            DEBUG_BLE("BLE Stack Event : CY_BLE_EVT_GAP_DEVICE_CONNECTED \r\n");
+
+            /* Variable to store values to update PHY to 2M */
+            cy_stc_ble_set_phy_info_t phy_param;
+            phy_param.allPhyMask = CY_BLE_PHY_NO_PREF_MASK_NONE;
+            phy_param.bdHandle = conn_handle.bdHandle;
+            phy_param.rxPhyMask = CY_BLE_PHY_MASK_LE_2M;
+            phy_param.txPhyMask = CY_BLE_PHY_MASK_LE_2M;
+
+            /* Function call to set PHY to 2M */
+            api_result = Cy_BLE_SetPhy(&phy_param);
+            if(api_result == CY_BLE_SUCCESS)
+            {
+                DEBUG_BLE("Set PHY to 2M successfull");
+                DEBUG_BLE("Request sent to switch PHY to 2M\r\n");
+            }
+            else
+            {
+                DEBUG_BLE("Set PHY to 2M API failure, errorcode = 0x%X", api_result);
+            }
+            break;
+        }
+
         /* This event is triggered when there is a change to either the maximum
          * Payload length or the maximum transmission time of Data Channel PDUs
          * in either direction
@@ -339,43 +365,6 @@ static void stack_event_handler(uint32_t event, void* eventParam)
         case CY_BLE_EVT_DATA_LENGTH_CHANGE:
         {
             DEBUG_BLE("CY_BLE_EVT_DATA_LENGTH_CHANGE\r\n");
-            cy_stc_ble_set_phy_info_t phyParam;
-
-            /* Set the PHY for the current connection to 2M */
-            phyParam.bdHandle = conn_handle.bdHandle;
-            phyParam.allPhyMask = CY_BLE_PHY_NO_PREF_MASK_NONE;
-            phyParam.phyOption = 0;
-            phyParam.rxPhyMask = CY_BLE_PHY_MASK_LE_2M;
-            phyParam.txPhyMask = CY_BLE_PHY_MASK_LE_2M;
-
-            api_result = Cy_BLE_SetPhy(&phyParam);
-            if(api_result != CY_BLE_SUCCESS)
-            {
-                DEBUG_BLE("Failed to set PHY..[bdHandle 0x%02X] : 0x%4x\r\n",
-                        phyParam.bdHandle, api_result);
-            }
-            else
-            {
-                DEBUG_BLE("Setting PHY.[bdHandle 0x%02X] \r\n",\
-                           phyParam.bdHandle);
-            }
-            break;
-        }
-
-        /* This event indicates completion of the Cy_BLE_SetPhy API*/
-        case CY_BLE_EVT_SET_PHY_COMPLETE:
-        {
-            DEBUG_BLE("Updating the Phy.....\r\n");
-            cy_stc_ble_events_param_generic_t * param =\
-                    (cy_stc_ble_events_param_generic_t *)eventParam;
-            if(param->status == CY_BLE_SUCCESS)
-            {
-                DEBUG_BLE("SET PHY updated to 2 Mbps\r\n");
-            }
-            else
-            {
-                DEBUG_BLE("SET PHY Could not update to 2 Mbps\r\n");
-            }
             break;
         }
 
@@ -383,6 +372,10 @@ static void stack_event_handler(uint32_t event, void* eventParam)
          * PHY or receiver PHY in use */
         case CY_BLE_EVT_PHY_UPDATE_COMPLETE:
         {
+            /* Initiate an MTU exchange request */
+            cy_stc_ble_gatt_xchg_mtu_param_t mtuParam = {conn_handle,\
+                    GATT_MTU_MAX};
+
             /* To remove unused parameter warning when UART debug is disabled*/
 #if (DEBUG_BLE_ENABLE == ENABLE)
             DEBUG_BLE("UPDATE PHY parameters\r\n");
@@ -396,6 +389,13 @@ static void stack_event_handler(uint32_t event, void* eventParam)
                         phyparam->rxPhyMask, phyparam->txPhyMask);
             }
 #endif
+            api_result = Cy_BLE_GATTC_ExchangeMtuReq(&mtuParam);
+
+            if(api_result != CY_BLE_SUCCESS)
+            {
+                DEBUG_BLE("Cy_BLE_GATTC_ExchangeMtuReq API Error: %xd \r\n",\
+                        api_result);
+            }
             break;
         }
 
@@ -420,16 +420,6 @@ static void stack_event_handler(uint32_t event, void* eventParam)
                        conn_handle.attId, conn_handle.bdHandle);
             printf("\n\rConnected to Device\r\n\n");
 
-            /* Initiate an MTU exchange request */
-            cy_stc_ble_gatt_xchg_mtu_param_t mtuParam = {conn_handle,\
-                                                         GATT_MTU_MAX};
-            api_result = Cy_BLE_GATTC_ExchangeMtuReq(&mtuParam);
-
-            if(api_result != CY_BLE_SUCCESS)
-            {
-                DEBUG_BLE("Cy_BLE_GATTC_ExchangeMtuReq API Error: %xd \r\n",\
-                           api_result);
-            }
             break;
         }
 
@@ -609,7 +599,7 @@ void ble_process_events(void)
 static uint8_t* adv_parser(uint16_t adv_type, cy_stc_ble_gapc_adv_report_param_t*
                          scan_report, uint8_t* adv_type_length)
 {
-    uint8_t length =0u;
+    uint8_t length = 0u;
     uint8_t* pName = NULL;
 
     for(uint8_t i = 0u; i < scan_report->dataLen; i += (length+1))
@@ -617,12 +607,12 @@ static uint8_t* adv_parser(uint16_t adv_type, cy_stc_ble_gapc_adv_report_param_t
         length = scan_report->data[i];
         if(scan_report->data[i+1] == adv_type)
         {
-            pName = & scan_report->data[i+2];
+            pName = &scan_report->data[i+2];
             *adv_type_length = length - 1;
-            return (pName);
+            return(pName);
         }
     }
-    return ((uint8_t*)NULL);
+    return((uint8_t*)NULL);
 }
 
 
