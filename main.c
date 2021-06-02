@@ -7,23 +7,24 @@
 * Related Document: See Readme.md
 *
 *
-********************************************************************************
-* (c) 2020, Cypress Semiconductor Corporation. All rights reserved.
-********************************************************************************
-* This software, including source code, documentation and related materials
-* ("Software"), is owned by Cypress Semiconductor Corporation or one of its
-* subsidiaries ("Cypress") and is protected by and subject to worldwide patent
-* protection (United States and foreign), United States copyright laws and
-* international treaty provisions. Therefore, you may use this Software only
-* as provided in the license agreement accompanying the software package from
-* which you obtained this Software ("EULA").
+*******************************************************************************
+* Copyright 2020-2021, Cypress Semiconductor Corporation (an Infineon company) or
+* an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
 *
+* This software, including source code, documentation and related
+* materials ("Software") is owned by Cypress Semiconductor Corporation
+* or one of its affiliates ("Cypress") and is protected by and subject to
+* worldwide patent protection (United States and foreign),
+* United States copyright laws and international treaty provisions.
+* Therefore, you may use this Software only as provided in the license
+* agreement accompanying the software package from which you
+* obtained this Software ("EULA").
 * If no EULA applies, Cypress hereby grants you a personal, non-exclusive,
-* non-transferable license to copy, modify, and compile the Software source
-* code solely for use in connection with Cypress's integrated circuit products.
-* Any reproduction, modification, translation, compilation, or representation
-* of this Software except as specified above is prohibited without the express
-* written permission of Cypress.
+* non-transferable license to copy, modify, and compile the Software
+* source code solely for use in connection with Cypress's
+* integrated circuit products.  Any reproduction, modification, translation,
+* compilation, or representation of this Software except as specified
+* above is prohibited without the express written permission of Cypress.
 *
 * Disclaimer: THIS SOFTWARE IS PROVIDED AS-IS, WITH NO WARRANTY OF ANY KIND,
 * EXPRESS OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, NONINFRINGEMENT, IMPLIED
@@ -34,9 +35,9 @@
 * not authorize its products for use in any products where a malfunction or
 * failure of the Cypress product may reasonably be expected to result in
 * significant property damage, injury or death ("High Risk Product"). By
-* including Cypress's product in a High Risk Product, the manufacturer of such
-* system or application assumes all risk of such use and in doing so agrees to
-* indemnify Cypress against all liability.
+* including Cypress's product in a High Risk Product, the manufacturer
+* of such system or application assumes all risk of such use and in doing
+* so agrees to indemnify Cypress against all liability.
 *******************************************************************************/
 #include "cyhal.h"
 #include "cybsp.h"
@@ -100,12 +101,6 @@ cy_stc_ble_gattc_write_req_t write_req;
 /* Variable to hold EZI2C slave context structure */
 cy_stc_scb_ezi2c_context_t ezi2c_context;
 
-/* Variable to hold Initialization configuration structure of EZI2C */
-const cy_stc_sysint_t ezi2c_intr_config = {
-        .intrSrc = EZI2C_IRQ ,
-        .intrPriority = EZI2C_INTR_PRIORITY
-    };
-
 
 /*******************************************************************************
  * Extern variables
@@ -152,10 +147,8 @@ int main(void)
     /* Initialize the device and board peripherals */
     result = cybsp_init() ;
 
-    if (result != CY_RSLT_SUCCESS)
-    {
-        CY_ASSERT(0);
-    }
+    /* Init failed. Stop program execution */
+    CY_ASSERT(result == CY_RSLT_SUCCESS);
 
     /* Initialize retarget-io to use the debug UART port */
     result = cy_retarget_io_init(CYBSP_DEBUG_UART_TX, CYBSP_DEBUG_UART_RX, \
@@ -166,10 +159,7 @@ int main(void)
                                     CYHAL_GPIO_DRIVE_STRONG, CYBSP_LED_STATE_OFF);
 
     /* retarget-io init or LED init failed. Stop program execution */
-    if (result != CY_RSLT_SUCCESS)
-    {
-        CY_ASSERT(0);
-    }
+    CY_ASSERT(result == CY_RSLT_SUCCESS);
 
        /*Enable interrupts */
     __enable_irq();
@@ -178,13 +168,14 @@ int main(void)
     ezi2c_status = tuner_ezi2c_init();
 
     /* ezi2c init failed. Stop program execution */
-    if(ezi2c_status != CY_SCB_EZI2C_SUCCESS)
-    {
-        CY_ASSERT(0);
-    }
+    CY_ASSERT(ezi2c_status == CY_SCB_EZI2C_SUCCESS);
 
     /* Initialize BLESS block */
     ble_init();
+
+    /* To avoid compiler warning*/
+    (void) result;
+    (void) ezi2c_status;
 
     /* \x1b[2J\x1b[;H - ANSI ESC sequence for clear screen */
     printf("\x1b[2J\x1b[;H");
@@ -202,7 +193,7 @@ int main(void)
         if((Cy_SCB_EZI2C_GetActivity(EZI2C_HW, &ezi2c_context) == CY_SCB_EZI2C_STATUS_WRITE1))
         {
             /* Disable I2C interrupts */
-            NVIC_DisableIRQ(ezi2c_intr_config.intrSrc);
+            NVIC_DisableIRQ(EZI2C_IRQ);
 
             /* OffSet Address written by Tuner */
             offset_address = ezi2c_context.baseAddr1;
@@ -211,7 +202,7 @@ int main(void)
             index_position = (uint32_t)(ezi2c_context.curBuf - ezi2c_buffer);
 
             /* Enable I2C interrupts */
-            NVIC_EnableIRQ(ezi2c_intr_config.intrSrc);
+            NVIC_EnableIRQ(EZI2C_IRQ);
 
             /* No of bytes written by Tuner */
             byte_count = index_position - offset_address;
@@ -262,16 +253,24 @@ static cy_en_scb_ezi2c_status_t tuner_ezi2c_init(void)
 {
     /* Variable to store EZI2C slave status codes */
     cy_en_scb_ezi2c_status_t status = CY_SCB_EZI2C_SUCCESS;
+    cy_rslt_t sysint_status = CY_RSLT_SUCCESS;
 
     /* Initialize EZI2C */
     status = Cy_SCB_EZI2C_Init(EZI2C_HW, &EZI2C_config, &ezi2c_context);
 
     /* Initialize and enable EZI2C interrupts */
-    Cy_SysInt_Init(&ezi2c_intr_config, ezi2c_isr);
-    NVIC_EnableIRQ(ezi2c_intr_config.intrSrc);
+    sysint_status = cyhal_system_set_isr(EZI2C_IRQ, EZI2C_IRQ,
+            EZI2C_INTR_PRIORITY, &ezi2c_isr);
+
+    NVIC_EnableIRQ(EZI2C_IRQ);
+
+    CY_ASSERT(sysint_status == CY_RSLT_SUCCESS);
 
     /* Enable EZI2C block */
     Cy_SCB_EZI2C_Enable(EZI2C_HW);
+
+    /* To avoid compiler warning*/
+    (void) sysint_status;
 
     return (status);
 }
@@ -366,7 +365,7 @@ void update_ezi2c_buffer(uint8_t * data, uint16_t size)
     if(notification_count == 0)
     {
         /* I2C interrupts are disabled when buffer is updated */
-        NVIC_DisableIRQ(ezi2c_intr_config.intrSrc);
+        NVIC_DisableIRQ(EZI2C_IRQ);
     }
 
     if(size <= NOTIFICATION_PKT_SIZE)
@@ -388,7 +387,8 @@ void update_ezi2c_buffer(uint8_t * data, uint16_t size)
     {
         /* Buffer update complete. Re-enable I2C interrupts */
         notification_count = 0;
-        NVIC_EnableIRQ(ezi2c_intr_config.intrSrc);
+
+        NVIC_EnableIRQ(EZI2C_IRQ);
     }
 }
 

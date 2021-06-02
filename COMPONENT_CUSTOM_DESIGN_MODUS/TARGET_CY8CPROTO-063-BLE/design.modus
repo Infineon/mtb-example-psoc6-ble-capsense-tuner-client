@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Design version="12" device_library_hint_path="../../../../Users/brvi/mtb_psoc6_ble_tuner/mtb_shared/mtb-pdl-cat1/latest-v2.X/devicesupport.xml" xmlns="http://cypress.com/xsd/cydesignfile_v3">
-    <ToolInfo version="2.2.0.2703"/>
+    <ToolInfo version="2.3.0.3916"/>
     <Devices>
         <Device mpn="CYBLE-416045-02">
             <BlockConfig>

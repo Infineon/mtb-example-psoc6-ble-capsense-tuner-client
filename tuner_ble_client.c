@@ -5,23 +5,24 @@
 *
 * Related Document: README.md
 *
-********************************************************************************
-* Copyright (2020), Cypress Semiconductor Corporation. All rights reserved.
-********************************************************************************
-* This software, including source code, documentation and related materials
-* ("Software"), is owned by Cypress Semiconductor Corporation or one of its
-* subsidiaries ("Cypress") and is protected by and subject to worldwide patent
-* protection (United States and foreign), United States copyright laws and
-* international treaty provisions. Therefore, you may use this Software only
-* as provided in the license agreement accompanying the software package from
-* which you obtained this Software ("EULA").
+*******************************************************************************
+* Copyright 2020-2021, Cypress Semiconductor Corporation (an Infineon company) or
+* an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
 *
+* This software, including source code, documentation and related
+* materials ("Software") is owned by Cypress Semiconductor Corporation
+* or one of its affiliates ("Cypress") and is protected by and subject to
+* worldwide patent protection (United States and foreign),
+* United States copyright laws and international treaty provisions.
+* Therefore, you may use this Software only as provided in the license
+* agreement accompanying the software package from which you
+* obtained this Software ("EULA").
 * If no EULA applies, Cypress hereby grants you a personal, non-exclusive,
-* non-transferable license to copy, modify, and compile the Software source
-* code solely for use in connection with Cypress's integrated circuit products.
-* Any reproduction, modification, translation, compilation, or representation
-* of this Software except as specified above is prohibited without the express
-* written permission of Cypress.
+* non-transferable license to copy, modify, and compile the Software
+* source code solely for use in connection with Cypress's
+* integrated circuit products.  Any reproduction, modification, translation,
+* compilation, or representation of this Software except as specified
+* above is prohibited without the express written permission of Cypress.
 *
 * Disclaimer: THIS SOFTWARE IS PROVIDED AS-IS, WITH NO WARRANTY OF ANY KIND,
 * EXPRESS OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, NONINFRINGEMENT, IMPLIED
@@ -32,9 +33,9 @@
 * not authorize its products for use in any products where a malfunction or
 * failure of the Cypress product may reasonably be expected to result in
 * significant property damage, injury or death ("High Risk Product"). By
-* including Cypress's product in a High Risk Product, the manufacturer of such
-* system or application assumes all risk of such use and in doing so agrees to
-* indemnify Cypress against all liability.
+* including Cypress's product in a High Risk Product, the manufacturer
+* of such system or application assumes all risk of such use and in doing
+* so agrees to indemnify Cypress against all liability.
 *******************************************************************************/
 
 /*******************************************************************************
@@ -153,22 +154,26 @@ void ble_init(void)
 {
     /* Variable to store common error codes received as API result */
     cy_en_ble_api_result_t api_result = CY_BLE_SUCCESS;
+    cy_rslt_t sysint_status = CY_RSLT_SUCCESS;
 
     /* BLESS interrupt configuration structure */
     const cy_stc_sysint_t  blessIsrCfg =
     {
         /* The BLESS interrupt */
-        .intrSrc       = bless_interrupt_IRQn,
+           .intrSrc       = bless_interrupt_IRQn,
 
-        /* The interrupt priority number */
-        .intrPriority  = BLESS_INTR_PRIORITY
+           /* The interrupt priority number */
+           .intrPriority  = BLESS_INTR_PRIORITY
     };
+
+    /* Initialize and enable BLESS interrupt */
+    sysint_status = cyhal_system_set_isr(bless_interrupt_IRQn, bless_interrupt_IRQn,
+            BLESS_INTR_PRIORITY, &bless_interrupt_handler);
+
+    CY_ASSERT(sysint_status == CY_RSLT_SUCCESS);
 
     /* Initialize the BLESS interrupt */
     cy_ble_config.hw->blessIsrConfig = &blessIsrCfg;
-
-    /* Hook interrupt service routines for BLESS */
-    Cy_SysInt_Init(cy_ble_config.hw->blessIsrConfig, bless_interrupt_handler);
 
     /* Register the generic event handler */
     Cy_BLE_RegisterEventCallback(stack_event_handler);
@@ -190,6 +195,9 @@ void ble_init(void)
 
     /* Enable BLE */
     api_result = Cy_BLE_Enable();
+
+    /* To avoid compiler warning*/
+    (void) sysint_status;
 
     if (api_result != CY_BLE_SUCCESS)
     {
